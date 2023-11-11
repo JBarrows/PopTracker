@@ -42,10 +42,12 @@ static int lua_error_handler(lua_State *L)
 // JODO: Make this a function of Tracker or something else, maybe static
 static int runLuaFunction(lua_State *L, const std::string name)
 {
+printf("runLuaFunc(%s)\n", name.c_str());
     std::string funcName = name;
     // Skip the $ notation
     if (funcName[0] == '$') {
         funcName = funcName.substr(1);
+printf("Trimmed funcName: %s\n", funcName.c_str());
     }
     int argc = 0;
     auto pos = funcName.find('|');
@@ -55,6 +57,7 @@ static int runLuaFunction(lua_State *L, const std::string name)
         t = lua_getglobal(L, funcName.c_str());
     } else {
         // Function has args provided. Clip the name and split the args
+        // CHANGED: We're taking the chance that this might not be a function
         t = lua_getglobal(L, funcName.substr(0, pos).c_str());
         if (t == LUA_TFUNCTION) {
             std::string::size_type next;
@@ -351,47 +354,9 @@ int Tracker::ProviderCountForCode(const std::string& code)
         return it->second;
     // "codes" starting with $ run Lua functions
     if (!code.empty() && code[0] == '$') {
-        // TODO: use a helper to access Lua instead of having _L here
-        int args = 0;
-        auto pos = code.find('|');
-        int t;
-        lua_pushcfunction(_L, lua_error_handler);
-        if (pos == code.npos) {
-            t = lua_getglobal(_L, code.c_str()+1);
-        } else {
-            t = lua_getglobal(_L, code.substr(1, pos-1).c_str());
-            if (t == LUA_TFUNCTION) {
-                std::string::size_type next;
-                while ((next = code.find('|', pos+1)) != code.npos) {
-                    lua_pushstring(_L, code.substr(pos+1, next-pos-1).c_str());
-                    args++;
-                    pos = next;
-                }
-                lua_pushstring(_L, code.substr(pos+1).c_str());
-                args++;
-            }
-        }
-        if (t != LUA_TFUNCTION) {
-            fprintf(stderr, "Missing Lua function for %s\n", code.c_str());
-            lua_pop(_L, 2); // non-function variable or nil, lua_error_handler
-            _providerCountCache[code] = 0;
-            return 0;
-        }
-        if (lua_pcall(_L, args, 1, -args-2) != LUA_OK) {
-            auto err = lua_tostring(_L, -1);
-            fprintf(stderr, "Error running %s:\n%s\n",
-                code.c_str(), err ? err : "Unknown error");
-            lua_pop(_L, 2); // error object, lua_error_handler
-            _providerCountCache[code] = 0;
-            return 0;
-        } else {
-            int isnum = 0;
-            int n = lua_tonumberx(_L, -1, &isnum);
-            if (!isnum && lua_isboolean(_L, -1) && lua_toboolean(_L, -1)) n = 1;
-            lua_pop(_L, 2); // result, lua_error_handler
-            _providerCountCache[code] = n;
-            return n;
-        }
+        int n = runLuaFunction(_L, code);
+        _providerCountCache[code] = n;
+        return n;
     }
     // other codes count items
     int res=0;
