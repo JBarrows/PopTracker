@@ -145,6 +145,12 @@ bool Tracker::AddItems(const std::string& file) {
                 _bulkItemUpdates.push_back(i->getID());
             else
                 onStateChanged.emit(this, i->getID());
+
+            // JODO: Should this only be !_bulkUpdate??
+            auto funcName = i->getOnChangeString();
+            if (!funcName.empty()) {
+                runLuaFunction(_L, funcName);
+            }
         }};
         item.onDisplayChange += {this, [this](void* sender) {
             JsonItem* i = (JsonItem*)sender;
