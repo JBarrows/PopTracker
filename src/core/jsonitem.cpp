@@ -114,6 +114,9 @@ JsonItem JsonItem::FromJSON(json& j)
     item._count  = std::max(item._minCount, std::min(to_int(j["initial_quantity"],0), item._maxCount));
     if (item._type == Type::CONSUMABLE && item._count > 0) item._stage1=1;
     
+    if (j["on_changed"].is_string()) {
+        item._onChangeStr = j["on_changed"];
+    }
     return item;
 }
 

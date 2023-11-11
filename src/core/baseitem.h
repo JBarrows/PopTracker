@@ -86,6 +86,7 @@ protected:
     int _increment = 1; // for consumable
     int _decrement = 1; // for consumables
     std::string _baseItem; // for toggle_badged
+    std::string _onChangeStr = "";
     
 public:
     virtual ~BaseItem() {}
@@ -98,6 +99,8 @@ public:
     const bool getCapturable() const { return _capturable; }
     const bool getLoop() const { return _loop; } 
     const bool getAllowDisabled() const { return _allowDisabled; }
+    // JODO: This is a terrible name, change it
+    const std::string& getOnChangeString() const { return _onChangeStr; }
     
     void setID(const std::string& id) { _id = id; }
     void setID(uint64_t id) { setID(std::to_string(id)); }
