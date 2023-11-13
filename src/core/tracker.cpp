@@ -39,8 +39,18 @@ static int lua_error_handler(lua_State *L)
     return 1;
 }
 
-// JODO: Make this a function of Tracker or something else, maybe static
-static int runLuaFunction(lua_State *L, const std::string name)
+/// Attempts to run a lua function by name and return an integer value
+int Tracker::RunLuaFunction(lua_State *L, const std::string name)
+{
+    int out = 0;
+    auto callStatus = RunLuaFunction(L, name, out);
+    if (callStatus == LUA_OK)
+        return out;
+    else
+        return 0;
+}
+
+int Tracker::RunLuaFunction(lua_State* L, const std::string name, int out)
 {
 printf("runLuaFunc(%s)\n", name.c_str());
     std::string funcName = name;
@@ -54,10 +64,10 @@ printf("Trimmed funcName: %s\n", funcName.c_str());
     lua_pushcfunction(L, lua_error_handler);
     int t = -1;
     if (pos == std::string::npos) {
+        // No args, makes this simple
         t = lua_getglobal(L, funcName.c_str());
     } else {
         // Function has args provided. Clip the name and split the args
-        // CHANGED: We're taking the chance that this might not be a function
         t = lua_getglobal(L, funcName.substr(0, pos).c_str());
         if (t == LUA_TFUNCTION) {
             std::string::size_type next;
@@ -74,7 +84,7 @@ printf("Trimmed funcName: %s\n", funcName.c_str());
     if (t != LUA_TFUNCTION) {
         fprintf(stderr, "Missing Lua function for %s\n", name.c_str());
         lua_pop(L, 2); // non-function variable or nil, lua_error_handler
-        return 0;
+        return -1;
     }
 
     auto callStatus = lua_pcall(L, argc, 1, -argc-2);
@@ -82,18 +92,18 @@ printf("Trimmed funcName: %s\n", funcName.c_str());
         auto err = lua_tostring(L, -1);
         fprintf(stderr, "Error running %s:\n%s\n", name.c_str(), err ? err : "Unknown error");
         lua_pop(L, 2); // error object, lua_error_handler
-        return 0;
+        return callStatus;
     }
     
+    // This version of the function is set to accept a number if possible
     int isnum = 0;
-    // JODO: Should return an abstract Lua value if possible, instead of strictly a number
     int n = lua_tonumberx(L, -1, &isnum); // || (lua_isboolean(L, -1) && lua_toboolean(L, -1));
     if (!isnum && lua_isboolean(L, -1) && lua_toboolean(L, -1))
         n = 1;
     lua_pop(L, 2); // result, lua_error_handler
+    out = n;
     
-    // JODO: Return callStatus as an output variable?
-    return n;
+    return callStatus;
 }
 
 bool Tracker::AddItems(const std::string& file) {
@@ -149,7 +159,7 @@ bool Tracker::AddItems(const std::string& file) {
             // JODO: Should this only be !_bulkUpdate??
             auto funcName = i->getOnChangeString();
             if (!funcName.empty()) {
-                runLuaFunction(_L, funcName);
+                Tracker::RunLuaFunction(_L, funcName);
             }
         }};
         item.onDisplayChange += {this, [this](void* sender) {
@@ -360,7 +370,7 @@ int Tracker::ProviderCountForCode(const std::string& code)
         return it->second;
     // "codes" starting with $ run Lua functions
     if (!code.empty() && code[0] == '$') {
-        int n = runLuaFunction(_L, code);
+        int n = Tracker::RunLuaFunction(_L, code);
         _providerCountCache[code] = n;
         return n;
     }

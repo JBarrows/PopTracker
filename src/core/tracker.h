@@ -26,6 +26,8 @@ public:
     Tracker(Pack* pack, lua_State *L);
     virtual ~Tracker();
     
+    static int RunLuaFunction(lua_State *L, const std::string name);
+    static int RunLuaFunction(lua_State *L, const std::string name, int out);
     
     struct Object final : public LuaType {
         // NOTE: we could use (something like) std::variant<...> ?
